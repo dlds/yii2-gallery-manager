@@ -1,6 +1,6 @@
 <?php
 
-namespace zxbodya\yii2\galleryManager;
+namespace dlds\galleryManager;
 
 use yii\base\Model;
 

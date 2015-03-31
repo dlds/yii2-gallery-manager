@@ -1,6 +1,6 @@
 # Gallery Manager usage instructions
 
-Yii2 port of https://github.com/zxbodya/yii-gallery-manager
+Yii2 port of https://github.com/dlds/yii-gallery-manager
 
 (frontend part mostly without changes, but backend was rewritten almost completely)
 
@@ -26,11 +26,11 @@ The preferred way to install this extension is through [composer](https://getcom
 
 Either run
 
-`php composer.phar require --prefer-dist zxbodya/yii2-gallery-manager "*@dev"`
+`php composer.phar require --prefer-dist dlds/yii2-gallery-manager "*@dev"`
 
 or add
 
-`"zxbodya/yii2-gallery-manager": "*@dev"`
+`"dlds/yii2-gallery-manager": "*@dev"`
 
 to the require section of your `composer.json` file.
 
@@ -40,7 +40,7 @@ Add migration to create table for images:
 
 ```php
 class m150318_154933_gallery_ext
-    extends zxbodya\yii2\galleryManager\migrations\m140930_003227_gallery_manager
+    extends dlds\galleryManager\migrations\m140930_003227_gallery_manager
 {
 
 }
