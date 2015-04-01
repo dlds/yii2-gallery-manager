@@ -82,7 +82,7 @@ class GalleryManagerAction extends Action
     protected function actionDelete($ids)
     {
 
-        $this->behavior->deleteImages($ids);
+        $this->behavior->deleteAllImages($ids);
 
         return 'OK';
     }

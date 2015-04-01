@@ -4,7 +4,7 @@ namespace dlds\galleryManager;
 
 use yii\db\ActiveRecord;
 
-class GalleryImage extends ActiveRecord {
+class GalleryImage extends GalleryImageProxy {
 
     public $name;
     public $description;
@@ -15,14 +15,6 @@ class GalleryImage extends ActiveRecord {
      * @var GalleryBehavior
      */
     protected $galleryBehavior;
-
-    /**
-     * @inheritdoc
-     */
-    public static function tableName()
-    {
-        return 'app_gallery_image';
-    }
 
     /**
      * @param GalleryBehavior $galleryBehavior
@@ -46,7 +38,7 @@ class GalleryImage extends ActiveRecord {
      */
     public function getUrl($version)
     {
-        return $this->galleryBehavior->getUrl($this->id, $version);
+        return $this->galleryBehavior->getImageUrl($this, $version);
     }
 
     /**

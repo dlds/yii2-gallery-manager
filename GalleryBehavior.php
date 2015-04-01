@@ -14,10 +14,24 @@ use yii\imagine\Image;
  * Behavior for adding gallery to any model.
  *
  * @author Bogdan Savluk <savluk.bogdan@gmail.com>
+ * @author Bogdan Savluk <jiri.svoboda@dlds.cz>
  *
  * @property string $galleryId
  */
 class GalleryBehavior extends Behavior {
+
+    /**
+     * Dirs
+     */
+    const DIR_ORIGINALS = 'originals';
+    const DIR_THUMBS = 'thumbnails';
+    const DIR_DEFAULT = 'defaults';
+
+    /**
+     * Default versions
+     */
+    const VERSION_ORIGINAL = 'original';
+    const VERSION_PREVIEW = 'preview';
 
     /**
      * @var string Type name assigned to model in image attachment action
@@ -67,7 +81,7 @@ class GalleryBehavior extends Behavior {
      * @note Be sure to not modify image passed to your version function,
      *       because it will be reused in all other versions,
      *       Before modification you should copy images as in examples below
-     * @note 'preview' & 'original' versions names are reserved for image preview in widget
+     * @note 'preview' & self::VERSION_ORIGINAL versions names are reserved for image preview in widget
      *       and original image files, if it is required - you can override them
      * @example
      * [
@@ -103,6 +117,20 @@ class GalleryBehavior extends Behavior {
      * @see GalleryManager::run
      */
     public $hasDescription = true;
+
+    /**
+     * @var array saving options
+     */
+    public $saveOptions = ['quality' => 100];
+    
+    /**
+     * @var array images
+     */
+    protected $_images = null;
+
+    /**
+     * @var int gallery id
+     */
     protected $_galleryId;
 
     /**
@@ -112,27 +140,18 @@ class GalleryBehavior extends Behavior {
     protected $_galleryTable = 'app_gallery_image';
 
     /**
-     * @param ActiveRecord $owner
+     * @inheritdoc
      */
     public function attach($owner)
     {
         parent::attach($owner);
-        if (!isset($this->versions['original']))
-        {
-            $this->versions['original'] = function ($image) {
-                return $image;
-            };
-        }
-        if (!isset($this->versions['preview']))
-        {
-            $this->versions['preview'] = function ($originalImage) {
-                /** @var ImageInterface $originalImage */
-                return $originalImage
-                                ->thumbnail(new Box($this->previewWidth, $this->previewHeight));
-            };
-        }
+
+        $this->attachDefaultVersions();
     }
 
+    /**
+     * @inheritdoc
+     */
     public function events()
     {
         return [
@@ -142,34 +161,34 @@ class GalleryBehavior extends Behavior {
         ];
     }
 
+    /**
+     * @inheritdoc
+     */
     public function beforeDelete()
     {
-        $images = $this->getImages();
-        foreach ($images as $image)
-        {
-            $this->deleteImage($image->id);
-        }
-        $dirPath = $this->directory . '/' . $this->getGalleryId();
-        @rmdir($dirPath);
+        $this->deleteAllImgFiles();
     }
 
+    /**
+     * @inheritdoc
+     */
     public function afterFind()
     {
         $this->_galleryId = $this->getGalleryId();
     }
 
+    /**
+     * @inheritdoc
+     */
     public function afterUpdate()
     {
-        $galleryId = $this->getGalleryId();
-        if ($this->_galleryId != $galleryId)
+        $id = $this->getGalleryId();
+
+        if ($this->_galleryId != $id)
         {
-            $dirPath1 = $this->directory . '/' . $this->_galleryId;
-            $dirPath2 = $this->directory . '/' . $galleryId;
-            rename($dirPath1, $dirPath2);
+            $this->renameDirectory($id);
         }
     }
-
-    protected $_images = null;
 
     /**
      * @return GalleryImage[]
@@ -188,6 +207,7 @@ class GalleryBehavior extends Behavior {
                     ->all();
 
             $this->_images = [];
+
             foreach ($imagesData as $imageData)
             {
                 $this->_images[] = new GalleryImage($this, $imageData);
@@ -197,21 +217,53 @@ class GalleryBehavior extends Behavior {
         return $this->_images;
     }
 
-    protected function getFileName($imageId, $version = 'original')
+    /**
+     * Get Gallery Id
+     *
+     * @return mixed as string or integer
+     * @throws Exception
+     */
+    public function getGalleryId()
     {
-        $path[] = $this->getGalleryId();
-        $path[] = $imageId;
-        $path[] = $version . '.' . $this->extension;
-        return implode(DIRECTORY_SEPARATOR, $path);
+        $pk = $this->owner->getPrimaryKey();
+
+        if (is_array($pk))
+        {
+            throw new Exception('Composite pk not supported');
+        }
+
+        return $pk;
     }
 
-    public function getUrl($imageId, $version = 'original')
+    /**
+     * Retrieves image url
+     * @param GalleryImageProxy $image given image
+     * @param string $version given image version
+     * @return string image url
+     */
+    public function getImageUrl($image, $version = self::VERSION_ORIGINAL)
     {
-        $path = $this->getFilePath($imageId, $version);
+        if (null === $image)
+        {
+            return null;
+        }
+
+        if (!($image instanceof GalleryImageProxy))
+        {
+            throw new Exception('Instance of GalleryImageProxy must be passed as first argument');
+        }
+
+        $path = $this->getImageFilePath($image->id, $version);
+
+        if (!file_exists($path))
+        {
+            $this->generateVersion($image->id, $version);
+        }
 
         if (!file_exists($path))
         {
             return null;
+            //$this->generateVersion($image->id, $version);
         }
 
         if (!empty($this->timeHash))
@@ -225,103 +277,85 @@ class GalleryBehavior extends Behavior {
             $suffix = '';
         }
 
-        return $this->url . '/' . $this->getFileName($imageId, $version) . $suffix;
+        return implode('/', [
+            $this->url,
+            $this->getVersionSubDir($version),
+            sprintf('%s%s', $this->getFileName($image->id, $version), $suffix)
+        ]);
     }
 
-    public function getFilePath($imageId, $version = 'original')
+    /**
+     * Retrieves image file path
+     * @param int $image_id given image id
+     * @param string $version given version
+     * @return string file path
+     */
+    public function getImageFilePath($image_id, $version = self::VERSION_ORIGINAL)
     {
-        return $this->directory . '/' . $this->getFileName($imageId, $version);
+        $subDir = $this->getVersionSubDir($version);
+
+        return implode(DIRECTORY_SEPARATOR, [
+            $this->directory,
+            $subDir,
+            $this->getFileName($image_id, $version)
+        ]);
     }
 
     /**
      * Replace existing image by specified file
-     *
-     * @param $imageId
+     * @param $image_id
      * @param $path
      */
-    public function replaceImage($imageId, $path)
+    public function replaceImage($image_id, $path)
     {
-        $this->createFolders($this->getFilePath($imageId, 'original'));
+        $this->deleteAllImageVersions($image_id);
 
-        $originalImage = Image::getImagine()->open($path);
-        //save image in original size
-        //create image preview for gallery manager
-        foreach ($this->versions as $version => $fn)
-        {
-            /** @var Image $image */
-            call_user_func($fn, $originalImage)
-                    ->save($this->getFilePath($imageId, $version));
-        }
-    }
-
-    private function removeFile($fileName)
-    {
-        if (file_exists($fileName))
-        {
-            @unlink($fileName);
-        }
+        $this->generateVersion($image_id, self::VERSION_ORIGINAL, null, $path);
     }
 
     /**
-     * Get Gallery Id
-     *
-     * @return mixed as string or integer
-     * @throws Exception
+     * Delete image based on given id
+     * @param int $image_id
      */
-    public function getGalleryId()
+    public function deleteImage($image_id)
     {
-        $pk = $this->owner->getPrimaryKey();
-        if (is_array($pk))
-        {
-            throw new Exception('Composite pk not supported');
-        }
-        else
-        {
-            return $pk;
-        }
-    }
+        $this->deleteAllImageVersions($image_id);
 
-    private function createFolders($filePath)
-    {
-        $parts = explode('/', $filePath);
-        // skip file name
-        $parts = array_slice($parts, 0, count($parts) - 1);
-        $i = 0;
-        $targetPath = implode(DIRECTORY_SEPARATOR, $parts);
-        $path = realpath($targetPath);
-        if (!$path)
-        {
-            mkdir($targetPath, 0777, true);
-        }
-    }
+        $filePath = $this->getImageFilePath($image_id, self::VERSION_ORIGINAL);
 
-    /////////////////////////////// ========== Public Actions ============ ///////////////////////////
-    public function deleteImage($imageId)
-    {
-        foreach ($this->versions as $version => $fn)
-        {
-            $filePath = $this->getFilePath($imageId, $version);
-            $this->removeFile($filePath);
-        }
-        $filePath = $this->getFilePath($imageId, 'original');
-        $parts = explode('/', $filePath);
-        $parts = array_slice($parts, 0, count($parts) - 1);
-        $dirPath = implode('/', $parts);
+        $dirPath = $this->getFileDir($filePath);
         @rmdir($dirPath);
 
         $db = \Yii::$app->db;
         $db->createCommand()
-                ->delete(
-                        $this->_galleryTable, ['id' => $imageId]
-                )->execute();
+                ->delete($this->_galleryTable, ['id' => $image_id])
+                ->execute();
     }
 
-    public function deleteImages($imageIds)
+    /**
+     * Deletes all image versions
+     * @param int $image_id
+     */
+    public function deleteAllImageVersions($image_id)
+    {
+        foreach ($this->versions as $version => $fn)
+        {
+            $filePath = $this->getImageFilePath($image_id, $version);
+            $this->removeFile($filePath);
+        }
+    }
+
+    /**
+     * Delete multiple images
+     * @param array $imageIds images ids
+     */
+    public function deleteAllImages(array $imageIds)
     {
         foreach ($imageIds as $imageId)
         {
             $this->deleteImage($imageId);
         }
+
         if ($this->_images !== null)
         {
             $removed = array_combine($imageIds, $imageIds);
@@ -333,22 +367,27 @@ class GalleryBehavior extends Behavior {
         }
     }
 
+    /**
+     * Adds image
+     * @param string $fileName
+     * @return \dlds\galleryManager\GalleryImage
+     */
     public function addImage($fileName)
     {
         $db = \Yii::$app->db;
+
         $db->createCommand()
-                ->insert(
-                        $this->_galleryTable, [
+                ->insert($this->_galleryTable, [
                     'type' => $this->type,
                     'owner_id' => $this->getGalleryId()
-                        ]
-                )->execute();
+                ])
+                ->execute();
 
         $id = $db->getLastInsertID();
+
         $db->createCommand()
-                ->update(
-                        $this->_galleryTable, ['rank' => $id], ['id' => $id]
-                )->execute();
+                ->update($this->_galleryTable, ['rank' => $id], ['id' => $id])
+                ->execute();
 
         $this->replaceImage($id, $fileName);
 
@@ -362,6 +401,11 @@ class GalleryBehavior extends Behavior {
         return $galleryImage;
     }
 
+    /**
+     * Aranges images
+     * @param array $order
+     * @return type
+     */
     public function arrange($order)
     {
         $orders = [];
@@ -383,9 +427,8 @@ class GalleryBehavior extends Behavior {
             $res[$k] = $orders[$i];
 
             \Yii::$app->db->createCommand()
-                    ->update(
-                            $this->_galleryTable, ['rank' => $orders[$i]], ['id' => $k]
-                    )->execute();
+                    ->update($this->_galleryTable, ['rank' => $orders[$i]], ['id' => $k])
+                    ->execute();
 
             $i++;
         }
@@ -403,9 +446,11 @@ class GalleryBehavior extends Behavior {
     {
         $imageIds = array_keys($imagesData);
         $imagesToUpdate = [];
+
         if ($this->_images !== null)
         {
             $selected = array_combine($imageIds, $imageIds);
+
             foreach ($this->_images as $img)
             {
                 if (isset($selected[$img->id]))
@@ -423,6 +468,7 @@ class GalleryBehavior extends Behavior {
                     ->andWhere(['in', 'id', $imageIds])
                     ->orderBy(['rank' => 'asc'])
                     ->all();
+
             foreach ($rawImages as $image)
             {
                 $imagesToUpdate[] = new GalleryImage($this, $image);
@@ -441,12 +487,222 @@ class GalleryBehavior extends Behavior {
                 $image->description = $imagesData[$image->id]['description'];
             }
             \Yii::$app->db->createCommand()
-                    ->update(
-                            $this->_galleryTable, ['name' => $image->name, 'description' => $image->description], ['id' => $image->id]
-                    )->execute();
+                    ->update($this->_galleryTable, [
+                        'name' => $image->name,
+                        'description' => $image->description
+                            ], [
+                        'id' => $image->id
+                    ])
+                    ->execute();
         }
 
         return $imagesToUpdate;
+    }
+
+    /**
+     * Generates image version
+     * @param int $image_id given image id
+     * @param string $version given version
+     * @param \Closure $fn callable fn
+     * @param string $originalFilePath original image
+     * @return mixed return value of callback
+     */
+    private function generateVersion($image_id, $version, $fn = null, $originalFilePath = null)
+    {
+        if (!isset($this->versions[$version]))
+        {
+            throw new Exception('Unsupported image version');
+        }
+
+        if (null === $fn)
+        {
+            $fn = $this->versions[$version];
+        }
+
+        if (null === $originalFilePath)
+        {
+            $originalFilePath = $this->getImageFilePath($image_id);
+        }
+
+        try
+        {
+            $original = Image::getImagine()->open($originalFilePath);
+        }
+        catch (\Imagine\Exception\InvalidArgumentException $ex)
+        {
+            return false;
+        }
+
+        $this->createFolders($image_id);
+
+        return call_user_func($fn, $original)->save($this->getImageFilePath($image_id, $version), $this->saveOptions);
+    }
+
+    /**
+     * Retrieves version subdir
+     * @param mixed $version version name
+     */
+    private function getVersionSubDir($version)
+    {
+        if (self::VERSION_ORIGINAL === $version)
+        {
+            return self::DIR_ORIGINALS;
+        }
+
+        return self::DIR_THUMBS;
+    }
+
+    /**
+     * Generates all versions
+     */
+    private function generateAllVersions($image_id, $originalFilePath = null)
+    {
+        foreach ($this->versions as $version => $fn)
+        {
+            $this->generateVersion($image_id, $version, $fn, $originalFilePath);
+        }
+    }
+
+    /**
+     * Attaches default versions
+     */
+    private function attachDefaultVersions()
+    {
+        if (!isset($this->versions[self::VERSION_ORIGINAL]))
+        {
+            $this->versions[self::VERSION_ORIGINAL] = function ($img) {
+
+                return $img;
+            };
+        }
+
+        if (!isset($this->versions[self::VERSION_PREVIEW]))
+        {
+            $this->versions[self::VERSION_PREVIEW] = function ($img) {
+
+                return $img->thumbnail(new Box($this->previewWidth, $this->previewHeight));
+            };
+        }
+    }
+
+    /**
+     * Deletes all attaches img files
+     */
+    private function deleteAllImgFiles()
+    {
+        $images = $this->getImages();
+
+        foreach ($images as $image)
+        {
+            $this->deleteImage($image->id);
+        }
+
+        $dirPath = implode(DIRECTORY_SEPARATOR, [
+            $this->directory,
+            $this->getGalleryId(),
+        ]);
+
+        @rmdir($dirPath);
+    }
+
+    /**
+     * Renames gallery directory based on given new id
+     * @param int $gallery_id given id
+     */
+    private function renameDirectory($gallery_id)
+    {
+        $dirPath1 = implode(DIRECTORY_SEPARATOR, [
+            $this->directory,
+            $this->_galleryId,
+        ]);
+
+        $dirPath2 = implode(DIRECTORY_SEPARATOR, [
+            $this->directory,
+            $gallery_id,
+        ]);
+
+        rename($dirPath1, $dirPath2);
+    }
+
+    /**
+     * Retrieves image file name
+     * @param int $image_id given image id
+     * @param string $version given version
+     * @return string filename
+     */
+    protected function getFileName($image_id, $version = self::VERSION_ORIGINAL)
+    {
+        if (self::VERSION_ORIGINAL === $version)
+        {
+            return implode(DIRECTORY_SEPARATOR, [
+                $this->getGalleryId(),
+                sprintf('%s.%s', $image_id, $this->extension)
+            ]);
+        }
+
+        return implode(DIRECTORY_SEPARATOR, [
+            $this->getGalleryId(),
+            $image_id,
+            sprintf('%s.%s', $version, $this->extension)
+        ]);
+    }
+
+    /**
+     * Removes given file
+     * @param type $filename
+     */
+    private function removeFile($filename)
+    {
+        if (file_exists($filename))
+        {
+            @unlink($filename);
+        }
+    }
+
+    /**
+     * Creates folders
+     * @param string $filepath
+     */
+    private function createFolders($image_id)
+    {
+        $filepaths = [
+            $this->getImageFilePath($image_id),
+            $this->getImageFilePath($image_id, self::VERSION_PREVIEW),
+        ];
+
+        foreach ($filepaths as $filepath)
+        {
+            $this->createFolder($filepath);
+        }
+    }
+
+    /**
+     * Creates folder based on given filepath
+     * @param string $filePath given filepath
+     */
+    private function createFolder($filePath)
+    {
+        $dirPath = $this->getFileDir($filePath);
+
+        $path = realpath($dirPath);
+
+        if (!$path)
+        {
+            mkdir($dirPath, 0777, true);
+        }
+    }
+
+    /**
+     * Retrieves file dir
+     * @param string $filepath
+     * @return string dir path
+     */
+    private function getFileDir($filepath)
+    {
+        $parts = explode(DIRECTORY_SEPARATOR, $filepath);
+        $parts = array_slice($parts, 0, count($parts) - 1);
+
+        return implode(DIRECTORY_SEPARATOR, $parts);
     }
 
 }
