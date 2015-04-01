@@ -2,24 +2,33 @@
 
 namespace dlds\galleryManager;
 
-use yii\base\Model;
+use yii\db\ActiveRecord;
 
-class GalleryImage extends Model
-{
+class GalleryImage extends ActiveRecord {
+
     public $name;
     public $description;
     public $id;
     public $rank;
+
     /**
      * @var GalleryBehavior
      */
     protected $galleryBehavior;
 
     /**
+     * @inheritdoc
+     */
+    public static function tableName()
+    {
+        return 'app_gallery_image';
+    }
+
+    /**
      * @param GalleryBehavior $galleryBehavior
      * @param array           $props
      */
-    function __construct(GalleryBehavior $galleryBehavior, array $props)
+    public function __construct(GalleryBehavior $galleryBehavior, array $props)
     {
 
         $this->galleryBehavior = $galleryBehavior;
@@ -43,7 +52,9 @@ class GalleryImage extends Model
     /**
      * @return GalleryBehavior
      */
-    public function getGalleryBehavior(){
+    public function getGalleryBehavior()
+    {
         return $this->galleryBehavior;
     }
+
 }
