@@ -25,7 +25,11 @@ class GalleryBehavior extends Behavior {
      */
     const DIR_ORIGINALS = 'originals';
     const DIR_THUMBS = 'thumbnails';
-    const DIR_DEFAULT = 'defaults';
+    
+    /**
+     * Default ids
+     */
+    const DEFAULT_IMAGE_ID = 'default';
 
     /**
      * Default versions
@@ -122,7 +126,7 @@ class GalleryBehavior extends Behavior {
      * @var array saving options
      */
     public $saveOptions = ['quality' => 100];
-    
+
     /**
      * @var array images
      */
@@ -245,7 +249,7 @@ class GalleryBehavior extends Behavior {
     {
         if (null === $image)
         {
-            return null;
+            return $this->getDefaultImageUrl($version);
         }
 
         if (!($image instanceof GalleryImageProxy))
@@ -260,28 +264,23 @@ class GalleryBehavior extends Behavior {
             $this->generateVersion($image->id, $version);
         }
 
+        return $this->getFileUrl($image->id, $path, $version);
+    }
+
+    /**
+     * Retrieves default image url
+     * @param mixed $version given version
+     */
+    public function getDefaultImageUrl($version, $image_id = self::DEFAULT_IMAGE_ID)
+    {
+        $path = $this->getImageFilePath($image_id, $version, true);
+
         if (!file_exists($path))
         {
-            return null;
-            //$this->generateVersion($image->id, $version);
+            $this->generateVersion($image_id, $version);
         }
 
-        if (!empty($this->timeHash))
-        {
-
-            $time = filemtime($path);
-            $suffix = '?' . $this->timeHash . '=' . crc32($time);
-        }
-        else
-        {
-            $suffix = '';
-        }
-
-        return implode('/', [
-            $this->url,
-            $this->getVersionSubDir($version),
-            sprintf('%s%s', $this->getFileName($image->id, $version), $suffix)
-        ]);
+        return $this->getFileUrl($image_id, $path, $version);
     }
 
     /**
@@ -292,12 +291,12 @@ class GalleryBehavior extends Behavior {
      */
     public function getImageFilePath($image_id, $version = self::VERSION_ORIGINAL)
     {
-        $subDir = $this->getVersionSubDir($version);
+        $subDir = $this->getVersionSubDir($version, $image_id);
 
         return implode(DIRECTORY_SEPARATOR, [
             $this->directory,
             $subDir,
-            $this->getFileName($image_id, $version)
+            $this->getFilePath($image_id, $version)
         ]);
     }
 
@@ -530,6 +529,7 @@ class GalleryBehavior extends Behavior {
         }
         catch (\Imagine\Exception\InvalidArgumentException $ex)
         {
+            throw $ex;
             return false;
         }
 
@@ -625,26 +625,61 @@ class GalleryBehavior extends Behavior {
     }
 
     /**
+     * Retrieves file url
+     * @param string $path file path
+     * @param mixed $version given version
+     * @return string file url
+     */
+    protected function getFileUrl($image_id, $path, $version)
+    {
+        if (!file_exists($path))
+        {
+            return null;
+        }
+
+        if (!empty($this->timeHash))
+        {
+
+            $time = filemtime($path);
+            $suffix = '?' . $this->timeHash . '=' . crc32($time);
+        }
+        else
+        {
+            $suffix = '';
+        }
+
+        return implode('/', [
+            $this->url,
+            $this->getVersionSubDir($version),
+            sprintf('%s%s', $this->getFilePath($image_id, $version), $suffix)
+        ]);
+    }
+
+    /**
      * Retrieves image file name
      * @param int $image_id given image id
      * @param string $version given version
      * @return string filename
      */
-    protected function getFileName($image_id, $version = self::VERSION_ORIGINAL)
+    protected function getFilePath($image_id, $version = self::VERSION_ORIGINAL)
     {
-        if (self::VERSION_ORIGINAL === $version)
+        if (self::DEFAULT_IMAGE_ID !== $image_id)
         {
-            return implode(DIRECTORY_SEPARATOR, [
-                $this->getGalleryId(),
-                sprintf('%s.%s', $image_id, $this->extension)
-            ]);
+            $path[] = $this->getGalleryId();
         }
 
-        return implode(DIRECTORY_SEPARATOR, [
-            $this->getGalleryId(),
-            $image_id,
-            sprintf('%s.%s', $version, $this->extension)
-        ]);
+        if (self::VERSION_ORIGINAL !== $version)
+        {
+            $path[] = $image_id;
+
+            $path[] = sprintf('%s.%s', $version, $this->extension);
+        }
+        else
+        {
+            $path[] = sprintf('%s.%s', $image_id, $this->extension);
+        }
+
+        return implode(DIRECTORY_SEPARATOR, $path);
     }
 
     /**
