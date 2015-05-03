@@ -3,7 +3,6 @@
 namespace dlds\galleryManager;
 
 use Imagine\Image\Box;
-use Imagine\Image\ImageInterface;
 use yii\base\Behavior;
 use yii\base\Exception;
 use yii\db\ActiveRecord;
@@ -25,7 +24,7 @@ class GalleryBehavior extends Behavior {
      */
     const DIR_ORIGINALS = 'originals';
     const DIR_THUMBS = 'thumbnails';
-    
+
     /**
      * Default ids
      */
@@ -100,6 +99,11 @@ class GalleryBehavior extends Behavior {
      * ]
      */
     public $versions;
+
+    /**
+     * @var string host to be used
+     */
+    public $host;
 
     /**
      * name of query param for modification time hash
@@ -204,11 +208,11 @@ class GalleryBehavior extends Behavior {
             $query = new \yii\db\Query();
 
             $imagesData = $query
-                    ->select(['id', 'name', 'description', 'rank'])
-                    ->from($this->_galleryTable)
-                    ->where(['type' => $this->type, 'owner_id' => $this->getGalleryId()])
-                    ->orderBy(['rank' => 'asc'])
-                    ->all();
+                ->select(['id', 'name', 'description', 'rank'])
+                ->from($this->_galleryTable)
+                ->where(['type' => $this->type, 'owner_id' => $this->getGalleryId()])
+                ->orderBy(['rank' => 'asc'])
+                ->all();
 
             $this->_images = [];
 
@@ -247,21 +251,16 @@ class GalleryBehavior extends Behavior {
      */
     public function getImageUrl($image, $version = self::VERSION_ORIGINAL)
     {
-        if (null === $image)
+        if (null === $image || !($image instanceof GalleryImageProxy))
         {
             return $this->getDefaultImageUrl($version);
         }
 
-        if (!($image instanceof GalleryImageProxy))
-        {
-            throw new Exception('Instance of GalleryImageProxy must be passed as first argument');
-        }
-
         $path = $this->getImageFilePath($image->id, $version);
 
-        if (!file_exists($path))
+        if (!file_exists($path) && !$this->generateVersion($image->id, $version))
         {
-            $this->generateVersion($image->id, $version);
+            return $this->getDefaultImageUrl($version);
         }
 
         return $this->getFileUrl($image->id, $path, $version);
@@ -275,9 +274,9 @@ class GalleryBehavior extends Behavior {
     {
         $path = $this->getImageFilePath($image_id, $version, true);
 
-        if (!file_exists($path))
+        if (!file_exists($path) && !$this->generateVersion($image_id, $version))
         {
-            $this->generateVersion($image_id, $version);
+            return null;
         }
 
         return $this->getFileUrl($image_id, $path, $version);
@@ -327,8 +326,8 @@ class GalleryBehavior extends Behavior {
 
         $db = \Yii::$app->db;
         $db->createCommand()
-                ->delete($this->_galleryTable, ['id' => $image_id])
-                ->execute();
+            ->delete($this->_galleryTable, ['id' => $image_id])
+            ->execute();
     }
 
     /**
@@ -359,7 +358,7 @@ class GalleryBehavior extends Behavior {
         {
             $removed = array_combine($imageIds, $imageIds);
             $this->_images = array_filter(
-                    $this->_images, function ($image) use (&$removed) {
+                $this->_images, function ($image) use (&$removed) {
                 return !isset($removed[$image->id]);
             }
             );
@@ -376,17 +375,17 @@ class GalleryBehavior extends Behavior {
         $db = \Yii::$app->db;
 
         $db->createCommand()
-                ->insert($this->_galleryTable, [
-                    'type' => $this->type,
-                    'owner_id' => $this->getGalleryId()
-                ])
-                ->execute();
+            ->insert($this->_galleryTable, [
+                'type' => $this->type,
+                'owner_id' => $this->getGalleryId()
+            ])
+            ->execute();
 
         $id = $db->getLastInsertID();
 
         $db->createCommand()
-                ->update($this->_galleryTable, ['rank' => $id], ['id' => $id])
-                ->execute();
+            ->update($this->_galleryTable, ['rank' => $id], ['id' => $id])
+            ->execute();
 
         $this->replaceImage($id, $fileName);
 
@@ -426,8 +425,8 @@ class GalleryBehavior extends Behavior {
             $res[$k] = $orders[$i];
 
             \Yii::$app->db->createCommand()
-                    ->update($this->_galleryTable, ['rank' => $orders[$i]], ['id' => $k])
-                    ->execute();
+                ->update($this->_galleryTable, ['rank' => $orders[$i]], ['id' => $k])
+                ->execute();
 
             $i++;
         }
@@ -461,12 +460,12 @@ class GalleryBehavior extends Behavior {
         else
         {
             $rawImages = (new Query())
-                    ->select(['id', 'name', 'description', 'rank'])
-                    ->from($this->_galleryTable)
-                    ->where(['type' => $this->type, 'owner_id' => $this->getGalleryId()])
-                    ->andWhere(['in', 'id', $imageIds])
-                    ->orderBy(['rank' => 'asc'])
-                    ->all();
+                ->select(['id', 'name', 'description', 'rank'])
+                ->from($this->_galleryTable)
+                ->where(['type' => $this->type, 'owner_id' => $this->getGalleryId()])
+                ->andWhere(['in', 'id', $imageIds])
+                ->orderBy(['rank' => 'asc'])
+                ->all();
 
             foreach ($rawImages as $image)
             {
@@ -486,13 +485,13 @@ class GalleryBehavior extends Behavior {
                 $image->description = $imagesData[$image->id]['description'];
             }
             \Yii::$app->db->createCommand()
-                    ->update($this->_galleryTable, [
-                        'name' => $image->name,
-                        'description' => $image->description
-                            ], [
-                        'id' => $image->id
-                    ])
-                    ->execute();
+                ->update($this->_galleryTable, [
+                    'name' => $image->name,
+                    'description' => $image->description
+                    ], [
+                    'id' => $image->id
+                ])
+                ->execute();
         }
 
         return $imagesToUpdate;
@@ -529,7 +528,7 @@ class GalleryBehavior extends Behavior {
         }
         catch (\Imagine\Exception\InvalidArgumentException $ex)
         {
-            throw $ex;
+            //throw $ex;
             return false;
         }
 
@@ -641,18 +640,25 @@ class GalleryBehavior extends Behavior {
         {
 
             $time = filemtime($path);
-            $suffix = '?' . $this->timeHash . '=' . crc32($time);
+            $suffix = '?'.$this->timeHash.'='.crc32($time);
         }
         else
         {
             $suffix = '';
         }
 
-        return implode('/', [
+        $urlParts = [
             $this->url,
             $this->getVersionSubDir($version),
             sprintf('%s%s', $this->getFilePath($image_id, $version), $suffix)
-        ]);
+        ];
+
+        if ($this->host)
+        {
+            array_unshift($urlParts, $this->host);
+        }
+
+        return str_replace('\\', '/', implode('/', $urlParts));
     }
 
     /**
@@ -739,5 +745,4 @@ class GalleryBehavior extends Behavior {
 
         return implode(DIRECTORY_SEPARATOR, $parts);
     }
-
 }

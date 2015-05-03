@@ -15,8 +15,8 @@ use yii\helpers\Url;
  *
  * @author Bogdan Savluk <savluk.bogdan@gmail.com>
  */
-class GalleryManager extends Widget
-{
+class GalleryManager extends Widget {
+
     /** @var ActiveRecord */
     public $model;
 
@@ -28,9 +28,7 @@ class GalleryManager extends Widget
 
     /** @var string Route to gallery controller */
     public $apiRoute = false;
-
     public $options = array();
-
 
     public function init()
     {
@@ -50,21 +48,22 @@ class GalleryManager extends Widget
         ];
     }
 
-
     /** Render widget */
     public function run()
     {
-        if ($this->apiRoute === null) {
+        if ($this->apiRoute === null)
+        {
             throw new Exception('$apiRoute must be set.', 500);
         }
 
         $images = array();
-        foreach ($this->behavior->getImages() as $image) {
+        foreach ($this->behavior->getImages() as $image)
+        {
             $images[] = array(
                 'id' => $image->id,
                 'rank' => $image->rank,
-                'name' => (string)$image->name,
-                'description' => (string)$image->description,
+                'name' => (string) $image->name,
+                'description' => (string) $image->description,
                 'preview' => $image->getUrl('preview'),
             );
         }
@@ -98,5 +97,4 @@ class GalleryManager extends Widget
 
         return $this->render('galleryManager');
     }
-
 }
