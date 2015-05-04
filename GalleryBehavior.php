@@ -336,11 +336,15 @@ class GalleryBehavior extends Behavior {
      */
     public function deleteAllImageVersions($image_id)
     {
+        $dirPath = $this->getFileDir($this->getImageFilePath($image_id, self::VERSION_PREVIEW));
+
         foreach ($this->versions as $version => $fn)
         {
             $filePath = $this->getImageFilePath($image_id, $version);
             $this->removeFile($filePath);
         }
+
+        @rmdir($dirPath);
     }
 
     /**
