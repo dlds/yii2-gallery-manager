@@ -662,7 +662,9 @@ class GalleryBehavior extends Behavior {
             array_unshift($urlParts, $this->host);
         }
 
-        return str_replace('\\', '/', implode('/', $urlParts));
+        $url = str_replace('\\', '/', implode('/', $urlParts));
+
+        return str_replace('//', '/', $url);
     }
 
     /**
