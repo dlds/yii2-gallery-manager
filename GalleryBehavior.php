@@ -657,14 +657,14 @@ class GalleryBehavior extends Behavior {
             sprintf('%s%s', $this->getFilePath($image_id, $version), $suffix)
         ];
 
-        if ($this->host)
-        {
-            array_unshift($urlParts, $this->host);
-        }
-
         $url = str_replace('\\', '/', implode('/', $urlParts));
 
-        return str_replace('//', '/', $url);
+        if ($this->host)
+        {
+            return $this->host.$url;
+        }
+
+        return $url;
     }
 
     /**
