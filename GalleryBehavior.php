@@ -374,15 +374,15 @@ class GalleryBehavior extends Behavior {
      * @param string $fileName
      * @return \dlds\galleryManager\GalleryImage
      */
-    public function addImage($fileName)
+    public function addImage($fileName, $attrs = [])
     {
         $db = \Yii::$app->db;
 
         $db->createCommand()
-            ->insert($this->_galleryTable, [
-                'type' => $this->type,
-                'owner_id' => $this->getGalleryId()
-            ])
+            ->insert($this->_galleryTable, \yii\helpers\ArrayHelper::merge($attrs, [
+                    'type' => $this->type,
+                    'owner_id' => $this->getGalleryId()
+            ]))
             ->execute();
 
         $id = $db->getLastInsertID();
