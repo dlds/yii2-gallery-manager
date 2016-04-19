@@ -62,6 +62,16 @@ class GalleryBehavior extends Behavior {
     public $previewWidth = 200;
 
     /**
+     * @var int original max width
+     */
+    public $originalWidth = 1920;
+
+    /**
+     * @var int original max height
+     */
+    public $originalHeight = 1080;
+
+    /**
      * Extension for saved images
      * @var string
      */
@@ -575,6 +585,16 @@ class GalleryBehavior extends Behavior {
         {
             $this->versions[self::VERSION_ORIGINAL] = function ($img) {
 
+                if ($this->originalWidth && $this->originalHeight)
+                {
+                    $size = $this->calculateSize($img, $this->originalWidth, $this->originalHeight);
+
+                    if (false !== $size)
+                    {
+                        return $img->resize($size);
+                    }
+                }
+
                 return $img;
             };
         }
@@ -750,5 +770,33 @@ class GalleryBehavior extends Behavior {
         $parts = array_slice($parts, 0, count($parts) - 1);
 
         return implode(DIRECTORY_SEPARATOR, $parts);
+    }
+
+    /**
+     * Calculates appropriate size based on given width / height ratio
+     * @param \Imagine\Image\ImageInterface $img
+     * @param int$width
+     * @param int $height
+     * @return boolean|Box
+     */
+    protected function calculateSize(\Imagine\Image\ImageInterface $img, $width, $height)
+    {
+        if ($img->getSize()->getWidth() > $width || $img->getSize()->getHeight() > $height)
+        {
+            if ($img->getSize()->getWidth() > $img->getSize()->getHeight())
+            {
+                $calculatedHeight = $width * $img->getSize()->getHeight() / $img->getSize()->getWidth();
+
+                return new Box($width, $calculatedHeight);
+            }
+            else
+            {
+                $calculatedWidth = $height * $img->getSize()->getWidth() / $img->getSize()->getHeight();
+
+                return new Box($calculatedWidth, $height);
+            }
+        }
+
+        return false;
     }
 }
