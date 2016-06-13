@@ -30,7 +30,7 @@ class GalleryManagerAction extends Action
      * @see GalleryManagerAction::run
      */
     public $types = [];
-
+    public $sort = SORT_ASC;
 
     protected $type;
     protected $behaviorName;
@@ -129,7 +129,7 @@ class GalleryManagerAction extends Action
         if (count($order) == 0) {
             throw new HttpException(400, 'No data, to save');
         }
-        $res = $this->behavior->arrange($order);
+        $res = $this->behavior->arrange($order, $this->sort);
 
         return Json::encode($res);
 

@@ -97,7 +97,9 @@
             photos[id] = photo;
             photo.data('id', id);
             photo.data('rank', rank);
-
+            photo.attr('data-key', id);
+            photo.attr('data-rank', rank);
+            
             $('img', photo).attr('src', src);
             if (opts.hasName) {
                 $('.caption h5', photo).text(name);
@@ -106,7 +108,6 @@
                 $('.caption p', photo).text(description);
             }
 
-            console.log(prepend);
             if (prepend) {
                 $images.prepend(photo);
             }

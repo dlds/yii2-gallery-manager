@@ -418,7 +418,7 @@ class GalleryBehavior extends Behavior {
      * @param array $order
      * @return type
      */
-    public function arrange($order)
+    public function arrange($order, $sort = SORT_ASC)
     {
         $orders = [];
         $i = 0;
@@ -431,13 +431,19 @@ class GalleryBehavior extends Behavior {
             $orders[] = $order[$k];
             $i++;
         }
-        sort($orders);
+
+        if (SORT_ASC == $sort)
+        {
+            sort($orders);
+        }
+        else
+        {
+            rsort($orders);
+        }
+
         $i = 0;
-        $res = [];
         foreach ($order as $k => $v)
         {
-            $res[$k] = $orders[$i];
-
             \Yii::$app->db->createCommand()
                 ->update($this->_galleryTable, ['rank' => $orders[$i]], ['id' => $k])
                 ->execute();
