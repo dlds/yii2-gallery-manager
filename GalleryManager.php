@@ -29,6 +29,9 @@ class GalleryManager extends Widget {
     /** @var string Route to gallery controller */
     public $apiRoute = false;
     public $options = array();
+    public $sort = SORT_ASC;
+    public $prepend = false;
+    public $view;
 
     public function init()
     {
@@ -57,7 +60,7 @@ class GalleryManager extends Widget {
         }
 
         $images = array();
-        foreach ($this->behavior->getImages() as $image)
+        foreach ($this->behavior->getImages($this->sort) as $image)
         {
             $images[] = array(
                 'id' => $image->id,
@@ -85,15 +88,21 @@ class GalleryManager extends Widget {
             'nameLabel' => Yii::t('galleryManager/main', 'Name'),
             'descriptionLabel' => Yii::t('galleryManager/main', 'Description'),
             'photos' => $images,
+            'prepend' => $this->prepend,
         );
 
         $opts = Json::encode($opts);
         $view = $this->getView();
         GalleryManagerAsset::register($view);
-        $view->registerJs("$('#{$this->id}').galleryManager({$opts});");
+        $view->registerJs("(function(){\$('#{$this->id}').galleryManager({$opts});})();", \yii\web\View::POS_READY);
 
         $this->options['id'] = $this->id;
         $this->options['class'] = 'gallery-manager';
+
+        if ($this->view)
+        {
+            return $this->render($this->view);
+        }
 
         return $this->render('galleryManager');
     }

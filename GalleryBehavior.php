@@ -211,7 +211,7 @@ class GalleryBehavior extends Behavior {
     /**
      * @return GalleryImage[]
      */
-    public function getImages()
+    public function getImages($sort = SORT_ASC)
     {
         if ($this->_images === null)
         {
@@ -221,7 +221,7 @@ class GalleryBehavior extends Behavior {
                 ->select(['id', 'name', 'description', 'rank'])
                 ->from($this->_galleryTable)
                 ->where(['type' => $this->type, 'owner_id' => $this->getGalleryId()])
-                ->orderBy(['rank' => 'asc'])
+                ->orderBy(['rank' => $sort])
                 ->all();
 
             $this->_images = [];
