@@ -302,11 +302,18 @@ class GalleryBehavior extends Behavior {
     {
         $subDir = $this->getVersionSubDir($version, $image_id);
 
-        return implode(DIRECTORY_SEPARATOR, [
+        $path = implode(DIRECTORY_SEPARATOR, [
             $this->directory,
             $subDir,
             $this->getFilePath($image_id, $version)
         ]);
+
+        if (!is_writable($path))
+        {
+            return $_SERVER['DOCUMENT_ROOT'].$path;
+        }
+
+        return $path;
     }
 
     /**
@@ -761,7 +768,12 @@ class GalleryBehavior extends Behavior {
 
         if (!$path)
         {
-            mkdir($dirPath, 0777, true);
+            $result = @mkdir($dirPath, 0777, true);
+
+            if (!$result)
+            {
+                @mkdir($_SERVER['DOCUMENT_ROOT'].$dirPath, 0777, true);
+            }
         }
     }
 
