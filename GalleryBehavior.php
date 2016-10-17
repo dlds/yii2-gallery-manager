@@ -142,6 +142,12 @@ class GalleryBehavior extends Behavior {
     public $saveOptions = ['quality' => 100];
 
     /**
+     * Table name of Gallery
+     * @var string
+     */
+    public $tableName = 'app_gallery_image';
+
+    /**
      * @var array images
      */
     protected $_images = null;
@@ -219,7 +225,7 @@ class GalleryBehavior extends Behavior {
 
             $imagesData = $query
                 ->select(['id', 'name', 'description', 'rank'])
-                ->from($this->_galleryTable)
+                ->from($this->tableName)
                 ->where(['type' => $this->type, 'owner_id' => $this->getGalleryId()])
                 ->orderBy(['rank' => $sort])
                 ->all();
@@ -336,7 +342,7 @@ class GalleryBehavior extends Behavior {
 
         $db = \Yii::$app->db;
         $db->createCommand()
-            ->delete($this->_galleryTable, ['id' => $image_id])
+            ->delete($this->tableName, ['id' => $image_id])
             ->execute();
     }
 
@@ -389,7 +395,7 @@ class GalleryBehavior extends Behavior {
         $db = \Yii::$app->db;
 
         $db->createCommand()
-            ->insert($this->_galleryTable, \yii\helpers\ArrayHelper::merge($attrs, [
+            ->insert($this->tableName, \yii\helpers\ArrayHelper::merge($attrs, [
                     'type' => $this->type,
                     'owner_id' => $this->getGalleryId()
             ]))
@@ -398,7 +404,7 @@ class GalleryBehavior extends Behavior {
         $id = $db->getLastInsertID();
 
         $db->createCommand()
-            ->update($this->_galleryTable, ['rank' => $id], ['id' => $id])
+            ->update($this->tableName, ['rank' => $id], ['id' => $id])
             ->execute();
 
         $this->replaceImage($id, $fileName);
@@ -445,7 +451,7 @@ class GalleryBehavior extends Behavior {
         foreach ($order as $k => $v)
         {
             \Yii::$app->db->createCommand()
-                ->update($this->_galleryTable, ['rank' => $orders[$i]], ['id' => $k])
+                ->update($this->tableName, ['rank' => $orders[$i]], ['id' => $k])
                 ->execute();
 
             $i++;
@@ -481,7 +487,7 @@ class GalleryBehavior extends Behavior {
         {
             $rawImages = (new Query())
                 ->select(['id', 'name', 'description', 'rank'])
-                ->from($this->_galleryTable)
+                ->from($this->tableName)
                 ->where(['type' => $this->type, 'owner_id' => $this->getGalleryId()])
                 ->andWhere(['in', 'id', $imageIds])
                 ->orderBy(['rank' => 'asc'])
@@ -505,7 +511,7 @@ class GalleryBehavior extends Behavior {
                 $image->description = $imagesData[$image->id]['description'];
             }
             \Yii::$app->db->createCommand()
-                ->update($this->_galleryTable, [
+                ->update($this->tableName, [
                     'name' => $image->name,
                     'description' => $image->description
                     ], [
