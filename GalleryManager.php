@@ -65,8 +65,6 @@ class GalleryManager extends Widget {
             $images[] = array(
                 'id' => $image->id,
                 'rank' => $image->rank,
-                'name' => (string) $image->name,
-                'description' => (string) $image->description,
                 'preview' => $image->getUrl('preview'),
             );
         }
@@ -79,14 +77,10 @@ class GalleryManager extends Widget {
         ];
 
         $opts = array(
-            'hasName' => $this->behavior->hasName ? true : false,
-            'hasDesc' => $this->behavior->hasDescription ? true : false,
             'uploadUrl' => Url::to($baseUrl + ['action' => 'ajaxUpload']),
             'deleteUrl' => Url::to($baseUrl + ['action' => 'delete']),
             'updateUrl' => Url::to($baseUrl + ['action' => 'changeData']),
             'arrangeUrl' => Url::to($baseUrl + ['action' => 'order']),
-            'nameLabel' => Yii::t('galleryManager/main', 'Name'),
-            'descriptionLabel' => Yii::t('galleryManager/main', 'Description'),
             'photos' => $images,
             'prepend' => $this->prepend,
         );

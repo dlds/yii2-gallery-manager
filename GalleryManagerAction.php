@@ -16,7 +16,6 @@ use yii\web\UploadedFile;
  *  - Image removal
  *  - Image upload/Multiple upload
  *  - Arrange images in gallery
- *  - Changing name/description associated with image
  *
  * @author Bogdan Savluk <savluk.bogdan@gmail.com>
  */
@@ -112,8 +111,6 @@ class GalleryManagerAction extends Action
             array(
                 'id' => $image->id,
                 'rank' => $image->rank,
-                'name' => (string)$image->name,
-                'description' => (string)$image->description,
                 'preview' => $image->getUrl('preview'),
             )
         );
@@ -155,8 +152,6 @@ class GalleryManagerAction extends Action
             $resp[] = array(
                 'id' => $model->id,
                 'rank' => $model->rank,
-                'name' => (string)$model->name,
-                'description' => (string)$model->description,
                 'preview' => $model->getUrl('preview'),
             );
         }

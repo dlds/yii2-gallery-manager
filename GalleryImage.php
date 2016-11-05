@@ -6,8 +6,6 @@ use yii\db\ActiveRecord;
 
 class GalleryImage extends GalleryImageProxy {
 
-    public $name;
-    public $description;
     public $id;
     public $rank;
 
@@ -25,8 +23,6 @@ class GalleryImage extends GalleryImageProxy {
 
         $this->galleryBehavior = $galleryBehavior;
 
-        $this->name = isset($props['name']) ? $props['name'] : '';
-        $this->description = isset($props['description']) ? $props['description'] : '';
         $this->id = isset($props['id']) ? $props['id'] : '';
         $this->rank = isset($props['rank']) ? $props['rank'] : '';
     }

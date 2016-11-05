@@ -38,7 +38,7 @@ class GalleryBehavior extends Behavior {
 
     /**
      * @var string Type name assigned to model in image attachment action
-     * @see GalleryManagerAction::$types
+     * @see GalleryManagerAction::$type
      * @example $type = 'Post' where 'Post' is the model name
      */
     public $type;
@@ -123,20 +123,6 @@ class GalleryBehavior extends Behavior {
     public $timeHash = '_';
 
     /**
-     * Used by GalleryManager
-     * @var bool
-     * @see GalleryManager::run
-     */
-    public $hasName = true;
-
-    /**
-     * Used by GalleryManager
-     * @var bool
-     * @see GalleryManager::run
-     */
-    public $hasDescription = true;
-
-    /**
      * @var array saving options
      */
     public $saveOptions = ['quality' => 100];
@@ -156,12 +142,6 @@ class GalleryBehavior extends Behavior {
      * @var int gallery id
      */
     protected $_galleryId;
-
-    /**
-     * Table name of Gallery
-     * @var string
-     */
-    protected $_galleryTable = 'app_gallery_image';
 
     /**
      * @inheritdoc
@@ -224,9 +204,9 @@ class GalleryBehavior extends Behavior {
             $query = new \yii\db\Query();
 
             $imagesData = $query
-                ->select(['id', 'name', 'description', 'rank'])
+                ->select(['id', 'rank'])
                 ->from($this->tableName)
-                ->where(['type' => $this->type, 'owner_id' => $this->getGalleryId()])
+                ->where(['owner_type' => $this->type, 'owner_id' => $this->getGalleryId()])
                 ->orderBy(['rank' => $sort])
                 ->all();
 
@@ -308,11 +288,18 @@ class GalleryBehavior extends Behavior {
     {
         $subDir = $this->getVersionSubDir($version, $image_id);
 
-        return implode(DIRECTORY_SEPARATOR, [
+        $path = implode(DIRECTORY_SEPARATOR, [
             $this->directory,
             $subDir,
             $this->getFilePath($image_id, $version)
         ]);
+
+        if (!is_writable($path))
+        {
+            return $path;
+        }
+
+        return $path;
     }
 
     /**
@@ -396,7 +383,7 @@ class GalleryBehavior extends Behavior {
 
         $db->createCommand()
             ->insert($this->tableName, \yii\helpers\ArrayHelper::merge($attrs, [
-                    'type' => $this->type,
+                    'owner_type' => $this->type,
                     'owner_id' => $this->getGalleryId()
             ]))
             ->execute();
@@ -422,7 +409,7 @@ class GalleryBehavior extends Behavior {
     /**
      * Aranges images
      * @param array $order
-     * @return type
+     * @return array
      */
     public function arrange($order, $sort = SORT_ASC)
     {
@@ -486,9 +473,9 @@ class GalleryBehavior extends Behavior {
         else
         {
             $rawImages = (new Query())
-                ->select(['id', 'name', 'description', 'rank'])
+                ->select(['id', 'rank'])
                 ->from($this->tableName)
-                ->where(['type' => $this->type, 'owner_id' => $this->getGalleryId()])
+                ->where(['owner_type' => $this->type, 'owner_id' => $this->getGalleryId()])
                 ->andWhere(['in', 'id', $imageIds])
                 ->orderBy(['rank' => 'asc'])
                 ->all();
@@ -502,18 +489,8 @@ class GalleryBehavior extends Behavior {
 
         foreach ($imagesToUpdate as $image)
         {
-            if (isset($imagesData[$image->id]['name']))
-            {
-                $image->name = $imagesData[$image->id]['name'];
-            }
-            if (isset($imagesData[$image->id]['description']))
-            {
-                $image->description = $imagesData[$image->id]['description'];
-            }
             \Yii::$app->db->createCommand()
                 ->update($this->tableName, [
-                    'name' => $image->name,
-                    'description' => $image->description
                     ], [
                     'id' => $image->id
                 ])
@@ -728,7 +705,7 @@ class GalleryBehavior extends Behavior {
 
     /**
      * Removes given file
-     * @param type $filename
+     * @param string $filename
      */
     private function removeFile($filename)
     {
@@ -767,7 +744,12 @@ class GalleryBehavior extends Behavior {
 
         if (!$path)
         {
-            mkdir($dirPath, 0777, true);
+            $result = @mkdir($dirPath, 0777, true);
+
+            if (!$result)
+            {
+                @mkdir($dirPath, 0777, true);
+            }
         }
     }
 

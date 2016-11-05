@@ -4,10 +4,6 @@
     var galleryDefaults = {
         csrfToken: $('meta[name=csrf-token]').attr('content'),
         csrfTokenName: $('meta[name=csrf-param]').attr('content'),
-        nameLabel: 'Name',
-        descriptionLabel: 'Description',
-        hasName: true,
-        hasDesc: true,
         uploadUrl: '',
         deleteUrl: '',
         updateUrl: '',
@@ -23,16 +19,8 @@
         var csrfParams = opts.csrfToken ? '&' + opts.csrfTokenName + '=' + opts.csrfToken : '';
         var photos = {}; // photo elements by id
         var $gallery = $(el);
-        if (!opts.hasName) {
-            if (!opts.hasDesc) {
-                $gallery.addClass('no-name-no-desc');
-                $('.edit_selected', $gallery).hide();
-            }
-            else
-                $gallery.addClass('no-name');
-
-        } else if (!opts.hasDesc)
-            $gallery.addClass('no-desc');
+        $gallery.addClass('no-name');
+        $gallery.addClass('no-desc');
 
         var $sorter = $('.sorter', $gallery);
         var $images = $('.images', $sorter);
@@ -51,48 +39,24 @@
                     .replace(/>/g, '&gt;');
         }
 
-        function createEditorElement(id, src, name, description) {
+        function createEditorElement(id, src) {
 
             var html = '<div class="photo-editor row">' +
-                    '<div class="col-xs-4">' +
-                    '<img src="' + htmlEscape(src) + '"  style="max-width:100%;">' +
-                    '</div>' +
-                    '<div class="col-xs-8">' +
-                    (opts.hasName
-                            ?
-                            '<div class="form-group">' +
-                            '<label class="control-label" for="photo_name_' + id + '">' + opts.nameLabel + ':</label>' +
-                            '<input class="form-control" type="text" name="photo[' + id + '][name]" class="input-xlarge" value="' + htmlEscape(name) + '" id="photo_name_' + id + '"/>' +
-                            '</div>' : '') +
-                    (opts.hasDesc
-                            ?
-                            '<div class="form-group">' +
-                            '<label class="control-label" for="photo_description_' + id + '">' + opts.descriptionLabel + ':</label>' +
-                            '<textarea class="form-control" name="photo[' + id + '][description]" rows="3" cols="40" class="input-xlarge" id="photo_description_' + id + '">' + htmlEscape(description) + '</textarea>' +
-                            '</div>' : '') +
+                    '<div class="col-xs-12">' +
+                        '<img src="' + htmlEscape(src) + '"  style="max-width:100%;">' +
                     '</div>' +
                     '</div>';
             return $(html);
         }
 
         var photoTemplate = '<div class="photo">' + '<div class="image-preview"><img src=""/></div><div class="caption">';
-        if (opts.hasName) {
-            photoTemplate += '<h5></h5>';
-        }
-        if (opts.hasDesc) {
-            photoTemplate += '<p></p>';
-        }
         photoTemplate += '</div><div class="actions">';
-
-        if (opts.hasName || opts.hasDesc) {
-            photoTemplate += '<span class="editPhoto btn btn-primary btn-xs"><i class="glyphicon glyphicon-pencil glyphicon-white"></i></span> ';
-        }
 
         photoTemplate += '<span class="deletePhoto btn btn-danger btn-xs"><i class="glyphicon glyphicon-remove glyphicon-white"></i></span>' +
                 '</div><input type="checkbox" class="photo-select"/></div>';
 
 
-        function addPhoto(id, src, name, description, rank, prepend) {
+        function addPhoto(id, src, rank, prepend) {
             var photo = $(photoTemplate);
             photos[id] = photo;
             photo.data('id', id);
@@ -101,13 +65,7 @@
             photo.attr('data-rank', rank);
             
             $('img', photo).attr('src', src);
-            if (opts.hasName) {
-                $('.caption h5', photo).text(name);
-            }
-            if (opts.hasDesc) {
-                $('.caption p', photo).text(description);
-            }
-
+            
             if (prepend) {
                 $images.prepend(photo);
             }
@@ -125,10 +83,9 @@
             for (var i = 0; i < l; i++) {
                 var id = ids[i];
                 var photo = photos[id],
-                        src = $('img', photo).attr('src'),
-                        name = $('.caption h5', photo).text(),
-                        description = $('.caption p', photo).text();
-                form.append(createEditorElement(id, src, name, description));
+                    src = $('img', photo).attr('src');
+                
+                form.append(createEditorElement(id, src));
             }
             if (l > 0) {
                 $editorModal.modal('show');
@@ -241,7 +198,7 @@
                         uploadedCount++;
                         if (this.status == 200) {
                             var resp = JSON.parse(this.response);
-                            addPhoto(resp['id'], resp['preview'], resp['name'], resp['description'], resp['rank'], opts.prepend);
+                            addPhoto(resp['id'], resp['preview'], resp['rank'], opts.prepend);
                             ids.push(resp['id']);
                         } else {
                             // exception !!!
@@ -251,8 +208,6 @@
                         if (uploadedCount === filesCount) {
                             $uploadProgress.css('width', '100%');
                             $progressOverlay.hide();
-                            if (opts.hasName || opts.hasDesc)
-                                editPhotos(ids);
                         }
                     };
                     xhr.send(fd);
@@ -332,12 +287,10 @@
                     processData: false,
                     dataType: "json"
                 }).done(function (resp) {
-                    addPhoto(resp['id'], resp['preview'], resp['name'], resp['description'], resp['rank'], opts.prepend);
+                    addPhoto(resp['id'], resp['preview'], resp['rank'], opts.prepend);
                     ids.push(resp['id']);
                     $uploadProgress.css('width', '100%');
                     $progressOverlay.hide();
-                    if (opts.hasName || opts.hasDesc)
-                        editPhotos(ids);
                 });
             });
         }
@@ -350,10 +303,6 @@
                     var p = data[key];
                     var photo = photos[p.id];
                     $('img', photo).attr('src', p['src']);
-                    if (opts.hasName)
-                        $('.caption h5', photo).text(p['name']);
-                    if (opts.hasDesc)
-                        $('.caption p', photo).text(p['description']);
                 }
                 $editorModal.modal('hide');
                 //deselect all items after editing
@@ -401,7 +350,7 @@
 
         for (var i = 0, l = opts.photos.length; i < l; i++) {
             var resp = opts.photos[i];
-            addPhoto(resp['id'], resp['preview'], resp['name'], resp['description'], resp['rank']);
+            addPhoto(resp['id'], resp['preview'], resp['rank']);
         }
     }
 
