@@ -17,7 +17,8 @@ use yii\imagine\Image;
  *
  * @property string $galleryId
  */
-class GalleryBehavior extends Behavior {
+class GalleryBehavior extends Behavior
+{
 
     /**
      * Dirs
@@ -48,6 +49,11 @@ class GalleryBehavior extends Behavior {
      * @example $owner = Post where Post is the ActiveRecord with GalleryBehavior attached under public function behaviors()
      */
     public $owner;
+    
+    /**
+     * @var string
+     */
+    public $attrUploads = false;
 
     /**
      * Widget preview height
@@ -160,6 +166,7 @@ class GalleryBehavior extends Behavior {
     {
         return [
             ActiveRecord::EVENT_BEFORE_DELETE => 'beforeDelete',
+            ActiveRecord::EVENT_AFTER_INSERT => 'handleUploads',
             ActiveRecord::EVENT_AFTER_UPDATE => 'afterUpdate',
             ActiveRecord::EVENT_AFTER_FIND => 'afterFind',
         ];
@@ -188,9 +195,25 @@ class GalleryBehavior extends Behavior {
     {
         $id = $this->getGalleryId();
 
-        if ($this->_galleryId != $id)
-        {
+        if ($this->_galleryId != $id) {
             $this->renameDirectory($id);
+        }
+
+        $this->processUploads();
+    }
+
+    public function handleUploads()
+    {
+        if(!$this->attrUploads || !isset($this->owner->{$this->attrUploads})) {
+            return false;
+        }
+        
+        $this->owner->{$this->attrUploads} = \yii\web\UploadedFile::getInstances($this->owner, $this->attrUploads);
+
+        if ($this->owner->validate()) {
+            foreach ($this->owner->{$this->attrUploads} as $att) {
+                $this->addImage($att->tempName);
+            }
         }
     }
 
@@ -199,8 +222,7 @@ class GalleryBehavior extends Behavior {
      */
     public function getImages($sort = SORT_ASC)
     {
-        if ($this->_images === null)
-        {
+        if ($this->_images === null) {
             $query = new \yii\db\Query();
 
             $imagesData = $query
@@ -212,8 +234,7 @@ class GalleryBehavior extends Behavior {
 
             $this->_images = [];
 
-            foreach ($imagesData as $imageData)
-            {
+            foreach ($imagesData as $imageData) {
                 $this->_images[] = new GalleryImage($this, $imageData);
             }
         }
@@ -231,8 +252,7 @@ class GalleryBehavior extends Behavior {
     {
         $pk = $this->owner->getPrimaryKey();
 
-        if (is_array($pk))
-        {
+        if (is_array($pk)) {
             throw new Exception('Composite pk not supported');
         }
 
@@ -247,15 +267,13 @@ class GalleryBehavior extends Behavior {
      */
     public function getImageUrl($image, $version = self::VERSION_ORIGINAL)
     {
-        if (null === $image || !($image instanceof GalleryImageProxy))
-        {
+        if (null === $image || !($image instanceof GalleryImageProxy)) {
             return $this->getDefaultImageUrl($version);
         }
 
         $path = $this->getImageFilePath($image->id, $version);
 
-        if (!file_exists($path) && !$this->generateVersion($image->id, $version))
-        {
+        if (!file_exists($path) && !$this->generateVersion($image->id, $version)) {
             return $this->getDefaultImageUrl($version);
         }
 
@@ -270,8 +288,7 @@ class GalleryBehavior extends Behavior {
     {
         $path = $this->getImageFilePath($image_id, $version, true);
 
-        if (!file_exists($path) && !$this->generateVersion($image_id, $version))
-        {
+        if (!file_exists($path) && !$this->generateVersion($image_id, $version)) {
             return null;
         }
 
@@ -294,8 +311,7 @@ class GalleryBehavior extends Behavior {
             $this->getFilePath($image_id, $version)
         ]);
 
-        if (!is_writable($path))
-        {
+        if (!is_writable($path)) {
             return $path;
         }
 
@@ -341,8 +357,7 @@ class GalleryBehavior extends Behavior {
     {
         $dirPath = $this->getFileDir($this->getImageFilePath($image_id, self::VERSION_PREVIEW));
 
-        foreach ($this->versions as $version => $fn)
-        {
+        foreach ($this->versions as $version => $fn) {
             $filePath = $this->getImageFilePath($image_id, $version);
             $this->removeFile($filePath);
         }
@@ -356,13 +371,11 @@ class GalleryBehavior extends Behavior {
      */
     public function deleteAllImages(array $imageIds)
     {
-        foreach ($imageIds as $imageId)
-        {
+        foreach ($imageIds as $imageId) {
             $this->deleteImage($imageId);
         }
 
-        if ($this->_images !== null)
-        {
+        if ($this->_images !== null) {
             $removed = array_combine($imageIds, $imageIds);
             $this->_images = array_filter(
                 $this->_images, function ($image) use (&$removed) {
@@ -398,8 +411,7 @@ class GalleryBehavior extends Behavior {
 
         $galleryImage = new GalleryImage($this, ['id' => $id]);
 
-        if ($this->_images !== null)
-        {
+        if ($this->_images !== null) {
             $this->_images[] = $galleryImage;
         }
 
@@ -415,28 +427,22 @@ class GalleryBehavior extends Behavior {
     {
         $orders = [];
         $i = 0;
-        foreach ($order as $k => $v)
-        {
-            if (!$v)
-            {
+        foreach ($order as $k => $v) {
+            if (!$v) {
                 $order[$k] = $k;
             }
             $orders[] = $order[$k];
             $i++;
         }
 
-        if (SORT_ASC == $sort)
-        {
+        if (SORT_ASC == $sort) {
             sort($orders);
-        }
-        else
-        {
+        } else {
             rsort($orders);
         }
 
         $i = 0;
-        foreach ($order as $k => $v)
-        {
+        foreach ($order as $k => $v) {
             \Yii::$app->db->createCommand()
                 ->update($this->tableName, ['rank' => $orders[$i]], ['id' => $k])
                 ->execute();
@@ -458,20 +464,15 @@ class GalleryBehavior extends Behavior {
         $imageIds = array_keys($imagesData);
         $imagesToUpdate = [];
 
-        if ($this->_images !== null)
-        {
+        if ($this->_images !== null) {
             $selected = array_combine($imageIds, $imageIds);
 
-            foreach ($this->_images as $img)
-            {
-                if (isset($selected[$img->id]))
-                {
+            foreach ($this->_images as $img) {
+                if (isset($selected[$img->id])) {
                     $imagesToUpdate[] = $selected[$img->id];
                 }
             }
-        }
-        else
-        {
+        } else {
             $rawImages = (new Query())
                 ->select(['id', 'rank'])
                 ->from($this->tableName)
@@ -480,15 +481,13 @@ class GalleryBehavior extends Behavior {
                 ->orderBy(['rank' => 'asc'])
                 ->all();
 
-            foreach ($rawImages as $image)
-            {
+            foreach ($rawImages as $image) {
                 $imagesToUpdate[] = new GalleryImage($this, $image);
             }
         }
 
 
-        foreach ($imagesToUpdate as $image)
-        {
+        foreach ($imagesToUpdate as $image) {
             \Yii::$app->db->createCommand()
                 ->update($this->tableName, [
                     ], [
@@ -510,27 +509,21 @@ class GalleryBehavior extends Behavior {
      */
     private function generateVersion($image_id, $version, $fn = null, $originalFilePath = null)
     {
-        if (!isset($this->versions[$version]))
-        {
+        if (!isset($this->versions[$version])) {
             throw new Exception('Unsupported image version');
         }
 
-        if (null === $fn)
-        {
+        if (null === $fn) {
             $fn = $this->versions[$version];
         }
 
-        if (null === $originalFilePath)
-        {
+        if (null === $originalFilePath) {
             $originalFilePath = $this->getImageFilePath($image_id);
         }
 
-        try
-        {
+        try {
             $original = Image::getImagine()->open($originalFilePath);
-        }
-        catch (\Imagine\Exception\InvalidArgumentException $ex)
-        {
+        } catch (\Imagine\Exception\InvalidArgumentException $ex) {
             //throw $ex;
             return false;
         }
@@ -546,8 +539,7 @@ class GalleryBehavior extends Behavior {
      */
     private function getVersionSubDir($version)
     {
-        if (self::VERSION_ORIGINAL === $version)
-        {
+        if (self::VERSION_ORIGINAL === $version) {
             return self::DIR_ORIGINALS;
         }
 
@@ -559,8 +551,7 @@ class GalleryBehavior extends Behavior {
      */
     private function generateAllVersions($image_id, $originalFilePath = null)
     {
-        foreach ($this->versions as $version => $fn)
-        {
+        foreach ($this->versions as $version => $fn) {
             $this->generateVersion($image_id, $version, $fn, $originalFilePath);
         }
     }
@@ -570,16 +561,13 @@ class GalleryBehavior extends Behavior {
      */
     private function attachDefaultVersions()
     {
-        if (!isset($this->versions[self::VERSION_ORIGINAL]))
-        {
+        if (!isset($this->versions[self::VERSION_ORIGINAL])) {
             $this->versions[self::VERSION_ORIGINAL] = function ($img) {
 
-                if ($this->originalWidth && $this->originalHeight)
-                {
+                if ($this->originalWidth && $this->originalHeight) {
                     $size = $this->calculateSize($img, $this->originalWidth, $this->originalHeight);
 
-                    if (false !== $size)
-                    {
+                    if (false !== $size) {
                         return $img->resize($size);
                     }
                 }
@@ -588,8 +576,7 @@ class GalleryBehavior extends Behavior {
             };
         }
 
-        if (!isset($this->versions[self::VERSION_PREVIEW]))
-        {
+        if (!isset($this->versions[self::VERSION_PREVIEW])) {
             $this->versions[self::VERSION_PREVIEW] = function ($img) {
 
                 return $img->thumbnail(new Box($this->previewWidth, $this->previewHeight));
@@ -604,8 +591,7 @@ class GalleryBehavior extends Behavior {
     {
         $images = $this->getImages();
 
-        foreach ($images as $image)
-        {
+        foreach ($images as $image) {
             $this->deleteImage($image->id);
         }
 
@@ -644,19 +630,15 @@ class GalleryBehavior extends Behavior {
      */
     protected function getFileUrl($image_id, $path, $version)
     {
-        if (!file_exists($path))
-        {
+        if (!file_exists($path)) {
             return null;
         }
 
-        if (!empty($this->timeHash))
-        {
+        if (!empty($this->timeHash)) {
 
             $time = filemtime($path);
-            $suffix = '?'.$this->timeHash.'='.crc32($time);
-        }
-        else
-        {
+            $suffix = '?' . $this->timeHash . '=' . crc32($time);
+        } else {
             $suffix = '';
         }
 
@@ -668,9 +650,8 @@ class GalleryBehavior extends Behavior {
 
         $url = str_replace('\\', '/', implode('/', $urlParts));
 
-        if ($this->host)
-        {
-            return $this->host.$url;
+        if ($this->host) {
+            return $this->host . $url;
         }
 
         return $url;
@@ -684,19 +665,15 @@ class GalleryBehavior extends Behavior {
      */
     protected function getFilePath($image_id, $version = self::VERSION_ORIGINAL)
     {
-        if (self::DEFAULT_IMAGE_ID !== $image_id)
-        {
+        if (self::DEFAULT_IMAGE_ID !== $image_id) {
             $path[] = $this->getGalleryId();
         }
 
-        if (self::VERSION_ORIGINAL !== $version)
-        {
+        if (self::VERSION_ORIGINAL !== $version) {
             $path[] = $image_id;
 
             $path[] = sprintf('%s.%s', $version, $this->extension);
-        }
-        else
-        {
+        } else {
             $path[] = sprintf('%s.%s', $image_id, $this->extension);
         }
 
@@ -709,8 +686,7 @@ class GalleryBehavior extends Behavior {
      */
     private function removeFile($filename)
     {
-        if (file_exists($filename))
-        {
+        if (file_exists($filename)) {
             @unlink($filename);
         }
     }
@@ -726,8 +702,7 @@ class GalleryBehavior extends Behavior {
             $this->getImageFilePath($image_id, self::VERSION_PREVIEW),
         ];
 
-        foreach ($filepaths as $filepath)
-        {
+        foreach ($filepaths as $filepath) {
             $this->createFolder($filepath);
         }
     }
@@ -742,12 +717,10 @@ class GalleryBehavior extends Behavior {
 
         $path = realpath($dirPath);
 
-        if (!$path)
-        {
+        if (!$path) {
             $result = @mkdir($dirPath, 0777, true);
 
-            if (!$result)
-            {
+            if (!$result) {
                 @mkdir($dirPath, 0777, true);
             }
         }
@@ -775,16 +748,12 @@ class GalleryBehavior extends Behavior {
      */
     protected function calculateSize(\Imagine\Image\ImageInterface $img, $width, $height)
     {
-        if ($img->getSize()->getWidth() > $width || $img->getSize()->getHeight() > $height)
-        {
-            if ($img->getSize()->getWidth() > $img->getSize()->getHeight())
-            {
+        if ($img->getSize()->getWidth() > $width || $img->getSize()->getHeight() > $height) {
+            if ($img->getSize()->getWidth() > $img->getSize()->getHeight()) {
                 $calculatedHeight = $width * $img->getSize()->getHeight() / $img->getSize()->getWidth();
 
                 return new Box($width, $calculatedHeight);
-            }
-            else
-            {
+            } else {
                 $calculatedWidth = $height * $img->getSize()->getWidth() / $img->getSize()->getHeight();
 
                 return new Box($calculatedWidth, $height);
@@ -793,4 +762,5 @@ class GalleryBehavior extends Behavior {
 
         return false;
     }
+
 }
