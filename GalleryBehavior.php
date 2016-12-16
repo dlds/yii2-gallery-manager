@@ -199,7 +199,7 @@ class GalleryBehavior extends Behavior
             $this->renameDirectory($id);
         }
 
-        $this->processUploads();
+        $this->handleUploads();
     }
 
     public function handleUploads()
@@ -208,9 +208,9 @@ class GalleryBehavior extends Behavior
             return false;
         }
         
-        $this->owner->{$this->attrUploads} = \yii\web\UploadedFile::getInstances($this->owner, $this->attrUploads);
-
         if ($this->owner->validate()) {
+            $this->owner->{$this->attrUploads} = \yii\web\UploadedFile::getInstances($this->owner, $this->attrUploads);
+
             foreach ($this->owner->{$this->attrUploads} as $att) {
                 $this->addImage($att->tempName);
             }
