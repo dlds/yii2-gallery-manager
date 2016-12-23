@@ -26,9 +26,13 @@
         var $images = $('.images', $sorter);
         var $editorModal = $('.editor-modal', $gallery);
         var $progressOverlay = $('.progress-overlay', $gallery);
+
+        if (!$progressOverlay.length) {
+            $progressOverlay = $('.overlay-upload-progress', $gallery);
+        }
+
         var $uploadProgress = $('.upload-progress', $progressOverlay);
         var $editorForm = $('.form', $editorModal);
-
 
         function htmlEscape(str) {
             return String(str)
@@ -43,7 +47,7 @@
 
             var html = '<div class="photo-editor row">' +
                     '<div class="col-xs-12">' +
-                        '<img src="' + htmlEscape(src) + '"  style="max-width:100%;">' +
+                    '<img src="' + htmlEscape(src) + '"  style="max-width:100%;">' +
                     '</div>' +
                     '</div>';
             return $(html);
@@ -63,13 +67,12 @@
             photo.data('rank', rank);
             photo.attr('data-key', id);
             photo.attr('data-rank', rank);
-            
+
             $('img', photo).attr('src', src);
-            
+
             if (prepend) {
                 $images.prepend(photo);
-            }
-            else {
+            } else {
                 $images.append(photo);
             }
 
@@ -83,8 +86,8 @@
             for (var i = 0; i < l; i++) {
                 var id = ids[i];
                 var photo = photos[id],
-                    src = $('img', photo).attr('src');
-                
+                        src = $('img', photo).attr('src');
+
                 form.append(createEditorElement(id, src));
             }
             if (l > 0) {
@@ -174,8 +177,15 @@
             });
         });
 
+        var trigger = $('.afile', $gallery);
+
+        if (!trigger.length) {
+            trigger = $('[data-gm-trigger="' + $gallery.attr('id') + '"]');
+        }
+
         if (window.FormData !== undefined) { // if XHR2 available
-            var uploadFileName = $('.afile', $gallery).attr('name');
+
+            var uploadFileName = trigger.attr('name');
 
             var multiUpload = function (files) {
                 if (files.length == 0)
@@ -264,16 +274,16 @@
                 el.addEventListener('dragend', handleDragEnd, false);
             })();
 
-            $('.afile', $gallery).attr('multiple', 'true').on('change', function (e) {
+            trigger.attr('multiple', 'true').on('change', function (e) {
                 e.preventDefault();
                 multiUpload(this.files);
             });
         } else {
-            $('.afile', $gallery).on('change', function (e) {
+            trigger.on('change', function (e) {
                 e.preventDefault();
                 var ids = [];
                 $progressOverlay.show();
-                $uploadProgress.css('width', '5%');
+                $uploadProgress.css('width', '100%');
 
                 var data = {};
                 if (opts.csrfToken)
