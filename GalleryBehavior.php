@@ -49,7 +49,7 @@ class GalleryBehavior extends Behavior
      * @example $owner = Post where Post is the ActiveRecord with GalleryBehavior attached under public function behaviors()
      */
     public $owner;
-    
+
     /**
      * @var string
      */
@@ -140,6 +140,11 @@ class GalleryBehavior extends Behavior
     public $tableName = 'app_gallery_image';
 
     /**
+     * @var \Closure
+     */
+    public $pkParser = null;
+
+    /**
      * @var array images
      */
     protected $_images = null;
@@ -204,10 +209,10 @@ class GalleryBehavior extends Behavior
 
     public function handleUploads()
     {
-        if(!$this->attrUploads || !isset($this->owner->{$this->attrUploads})) {
+        if (!$this->attrUploads || !isset($this->owner->{$this->attrUploads})) {
             return false;
         }
-        
+
         if ($this->owner->validate()) {
             $this->owner->{$this->attrUploads} = \yii\web\UploadedFile::getInstances($this->owner, $this->attrUploads);
 
@@ -251,6 +256,10 @@ class GalleryBehavior extends Behavior
     public function getGalleryId()
     {
         $pk = $this->owner->getPrimaryKey();
+
+        if (is_callable($this->pkParser)) {
+            $pk = call_user_func($this->pkParser, $pk);
+        }
 
         if (is_array($pk)) {
             throw new Exception('Composite pk not supported');
