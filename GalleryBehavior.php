@@ -516,7 +516,7 @@ class GalleryBehavior extends Behavior
      * @param string $originalFilePath original image
      * @return mixed return value of callback
      */
-    private function generateVersion($image_id, $version, $fn = null, $originalFilePath = null)
+    public function generateVersion($image_id, $version, $fn = null, $originalFilePath = null)
     {
         if (!isset($this->versions[$version])) {
             throw new Exception('Unsupported image version');
@@ -637,7 +637,7 @@ class GalleryBehavior extends Behavior
      * @param mixed $version given version
      * @return string file url
      */
-    protected function getFileUrl($image_id, $path, $version)
+    public function getFileUrl($image_id, $path, $version)
     {
         if (!file_exists($path)) {
             return null;
